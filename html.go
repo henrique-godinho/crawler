@@ -2,6 +2,8 @@ package main
 
 import (
 	"fmt"
+	"io"
+	"net/http"
 	"net/url"
 	"strings"
 
@@ -127,4 +129,33 @@ func extractPageData(html, pageURL string) PageData {
 	pd.ImageURLs = imgURLS
 
 	return pd
+}
+
+func getHTML(rawURL string) (string, error) {
+	req, err := http.NewRequest("GET", rawURL, nil)
+	if err != nil {
+		fmt.Println("fail to create req")
+		return "", err
+	}
+	req.Header.Add("User-Agent", "BootCrawler/1.0")
+	var client http.Client
+	res, err := client.Do(req)
+
+	if res.StatusCode >= 400 {
+		return "", fmt.Errorf("http error: %v", res.StatusCode)
+	}
+
+	contentType := res.Header.Get("Content-Type")
+
+	if contentType != "text/html" {
+		return "", fmt.Errorf("invalid content-type %s", contentType)
+	}
+
+	body, err := io.ReadAll(res.Body)
+	if err != nil {
+		return "", fmt.Errorf("error reading body %v", err)
+	}
+
+	return string(body), nil
+
 }
