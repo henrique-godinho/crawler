@@ -63,7 +63,7 @@ func getURLsFromHTML(htmlBody string, baseURL *url.URL) ([]string, error) {
 			if u.IsAbs() {
 				urls = append(urls, u.String())
 			} else {
-				urls = append(urls, baseURL.String()+val)
+				urls = append(urls, baseURL.Scheme+"://"+baseURL.Host+val)
 			}
 		}
 	})
@@ -88,7 +88,7 @@ func getImagesFromHTML(htmlBody string, baseURL *url.URL) ([]string, error) {
 			if u.IsAbs() {
 				urls = append(urls, u.String())
 			} else {
-				urls = append(urls, baseURL.String()+val)
+				urls = append(urls, strings.TrimRight(baseURL.String(), "/")+val)
 			}
 		}
 	})
@@ -147,7 +147,7 @@ func getHTML(rawURL string) (string, error) {
 
 	contentType := res.Header.Get("Content-Type")
 
-	if contentType != "text/html" {
+	if contentType != "text/html; charset=utf-8" {
 		return "", fmt.Errorf("invalid content-type %s", contentType)
 	}
 
