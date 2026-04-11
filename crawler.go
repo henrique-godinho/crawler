@@ -5,19 +5,20 @@ import (
 	"net/url"
 )
 
-func crawlPage(rawBaseURL, rawCurrentURL string, pages map[string]int) {
-	baseURL, err := url.Parse(rawBaseURL)
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
+func (cfg *config) crawlPage(rawCurrentURL string) {
+
+	cfg.concurrencyControl <- struct{}{}
+	defer func() {
+		<-cfg.concurrencyControl
+		cfg.wg.Done()
+	}()
+
 	currentURL, err := url.Parse(rawCurrentURL)
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
-	if baseURL.Host != currentURL.Host {
-		fmt.Println("different domains at first call!")
+	if cfg.baseURL.Host != currentURL.Host {
 		return
 	}
 
@@ -27,29 +28,43 @@ func crawlPage(rawBaseURL, rawCurrentURL string, pages map[string]int) {
 		return
 	}
 
-	_, ok := pages[normCurrentURL]
-	if ok {
-		pages[normCurrentURL]++
-		return
-	} else {
-		pages[normCurrentURL] = 1
+	if ok := cfg.addPageVisit(normCurrentURL); ok {
+		fmt.Printf("crawling %s\n", rawCurrentURL)
+		html, err := getHTML(rawCurrentURL)
+		if err != nil {
+			fmt.Printf("error getting HTML %v\n", err)
+			return
+		}
+
+		cfg.mu.Lock()
+		cfg.pages[normCurrentURL] = extractPageData(html, rawCurrentURL)
+		cfg.mu.Unlock()
+
+		pageLinks, err := getURLsFromHTML(html, cfg.baseURL)
+		if err != nil {
+			fmt.Println("error getting urls from html")
+			return
+		}
+
+		for _, link := range pageLinks {
+			cfg.wg.Add(1)
+			go cfg.crawlPage(link)
+		}
+
 	}
 
-	html, err := getHTML(rawCurrentURL)
-	if err != nil {
-		fmt.Printf("error getting HTML %v\n", err)
-		return
-	}
+}
 
-	pageLinks, err := getURLsFromHTML(html, baseURL)
-	if err != nil {
-		fmt.Println("error getting urls from html")
-		return
+func (cfg *config) addPageVisit(normalisedURL string) (isFirst bool) {
+	cfg.mu.Lock()
+	defer cfg.mu.Unlock()
+	if len(cfg.pages) >= cfg.maxPages {
+		return false
 	}
-
-	for _, link := range pageLinks {
-		fmt.Printf("calling %s\n", link)
-		crawlPage(rawBaseURL, link, pages)
+	_, ok := cfg.pages[normalisedURL]
+	if !ok {
+		cfg.pages[normalisedURL] = PageData{}
+		return true
 	}
-
+	return false
 }

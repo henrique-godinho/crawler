@@ -147,7 +147,7 @@ func getHTML(rawURL string) (string, error) {
 
 	contentType := res.Header.Get("Content-Type")
 
-	if contentType != "text/html; charset=utf-8" {
+	if !strings.HasPrefix(contentType, "text/html") {
 		return "", fmt.Errorf("invalid content-type %s", contentType)
 	}
 
