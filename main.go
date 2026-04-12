@@ -64,8 +64,10 @@ func main() {
 	go cfg.crawlPage(os.Args[1])
 	cfg.wg.Wait()
 
-	for page := range cfg.pages {
-		fmt.Println(page)
+	err = writeJSONReport(cfg.pages, "report.json")
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(1)
 	}
 
 }
